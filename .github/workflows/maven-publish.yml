@@ -36,7 +36,7 @@ jobs:
         with:
           # You need to configure these for your SonarCloud project
           args: >
-            -Dsonar.projectKey=madhusudhanak
+            -Dsonar.projectKey=madhusudhanakk
             -Dsonar.organization=madhusudhanak
             -Dsonar.host.url=https://sonarcloud.io
 
