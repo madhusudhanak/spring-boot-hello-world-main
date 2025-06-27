@@ -1,0 +1,76 @@
+name: Build, Test & Push to GitHub Container Registry
+
+on:
+  push:
+    branches:
+      - main # Trigger this workflow on pushes to the 'main' branch
+  pull_request:
+    branches:
+      - main # Also trigger on pull requests to 'main' for early feedback
+
+jobs:
+  build-and-push-docker:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+
+    permissions:
+      contents: read # Allow reading repository content (for checkout)
+      packages: write # Allow writing to GitHub Packages (for pushing Docker images)
+
+    steps:
+    - name: Checkout repository
+      # This action checks out your repository under $GITHUB_WORKSPACE,
+      # so your workflow can access it.
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      # This action sets up a Java Development Kit (JDK) environment.
+      # Specify the Java version that matches your Spring Boot project.
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17' # Ensure this matches the java.version in your pom.xml
+        distribution: 'temurin' # Recommended distribution for OpenJDK
+
+    - name: Build Spring Boot application with Maven
+      # This step compiles, tests, and packages your Spring Boot application
+      # into an executable JAR file. We skip tests for a quicker build in CI,
+      # but you might want a separate step for full test execution.
+      run: mvn clean install -DskipTests
+
+    - name: Log in to GitHub Container Registry
+      # This step authenticates with the GitHub Container Registry (ghcr.io)
+      # using the GITHUB_TOKEN provided by GitHub Actions.
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }} # The GitHub username of the actor who triggered the workflow
+        password: ${{ secrets.GITHUB_TOKEN }} # The GITHUB_TOKEN secret is automatically provided
+
+    - name: Build Docker image
+      # This step builds the Docker image based on your Dockerfile.
+      # It tags the image with the repository name and the short SHA of the commit.
+      # The image name will be ghcr.io/YOUR_USERNAME/YOUR_REPO_NAME:SHORT_SHA
+      id: docker_build
+      run: |
+        IMAGE_NAME=ghcr.io/${{ github.repository }}
+        VERSION=$(echo ${{ github.sha }} | cut -c1-7) # Use short SHA as tag
+
+        echo "Building Docker image: ${IMAGE_NAME}:${VERSION}"
+        docker build -t ${IMAGE_NAME}:${VERSION} .
+
+        echo "docker_image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+        echo "docker_image_tag=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Push Docker image to GitHub Container Registry
+      # This step pushes the built Docker image to GHCR.
+      run: |
+        IMAGE_NAME=${{ steps.docker_build.outputs.docker_image_name }}
+        IMAGE_TAG=${{ steps.docker_build.outputs.docker_image_tag }}
+
+        echo "Pushing Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
+        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+
+        # Optional: Push a 'latest' tag as well
+        echo "Pushing Docker image: ${IMAGE_NAME}:latest"
+        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+        docker push ${IMAGE_NAME}:latest
+
