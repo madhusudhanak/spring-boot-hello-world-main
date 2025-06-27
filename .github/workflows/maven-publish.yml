@@ -1,21 +1,68 @@
-name: SonarCloud Analysis
+name: CI/CD Pipeline for Spring Boot App
+
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - main # Trigger on push to the main branch
+
 jobs:
-  sonarcloud:
-    name: SonarCloud Scan
+  build-and-scan-and-push:
     runs-on: ubuntu-latest
+    env:
+      SONAR_SCANNER_VERSION: 4.8.0.2856 # Specify SonarQube Scanner version
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
+          # Fetch depth 0 is required by SonarQube to analyze the entire history
           fetch-depth: 0
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Spring Boot application with Maven
+        run: mvn clean install -DskipTests
+
+      #- name: SonarQube Scan
+       # uses: sonarsource/sonarcloud-github-action@master
+        #env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Required for GitHub integration
+         # SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Your SonarCloud token
+        #with:
+          # You need to configure these for your SonarCloud project
+         # args: >
+          #  -Dsonar.projectKey=madhusudhanakk
+           # -Dsonar.organization=madhusudhanak
+            #-Dsonar.host.url=https://sonarcloud.io
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/hello-spring-boot:latest # Docker Hub
+            ghcr.io/${{ github.repository }}:latest # GitHub Container Registry
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
