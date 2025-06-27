@@ -36,8 +36,8 @@ jobs:
         with:
           # You need to configure these for your SonarCloud project
           args: >
-            -Dsonar.projectKey=YOUR_SONARCLOUD_PROJECT_KEY
-            -Dsonar.organization=YOUR_SONARCLOUD_ORGANIZATION_KEY
+            -Dsonar.projectKey=madhuk_madhuk1
+            -Dsonar.organization=madhuk
             -Dsonar.host.url=https://sonarcloud.io
 
       - name: Set up Docker Buildx
